@@ -1,0 +1,4 @@
+# Config for the Gantry factory (https://github.com/adamlefevre/gantry), which works on this repo's issues.
+setup: pip install -r requirements.txt
+# No `test:` yet: tests/test_compaction.py needs live R2 credentials, which the sandbox
+# never gets. Until there's an offline test, factory runs here produce draft PRs only.

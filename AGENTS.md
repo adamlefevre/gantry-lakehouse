@@ -7,6 +7,7 @@ An open-source, serverless lakehouse reference implementation:
 3. **Scheduled Maintenance:** Serverless containerized compaction and cleanup running on **Modal** (daily cron, zero idle cost).
 4. **CI/CD:** GitHub Actions running PyTest integration tests against ephemeral test namespaces (`data/test_runs/run_<uuid>`).
 5. **Factory analytics store:** the [Gantry](https://github.com/adamlefevre/gantry) software factory writes task telemetry into this bucket under `telemetry/`. The record shape and path layout are a contract owned by the factory repo (`docs/telemetry.md` there). This repo is also the factory's first target repo (see `.gantry.yml`).
+6. **Public demo bucket:** `gantry-demo` holds only the NYC Taxi sample, with open CORS so a browser DuckDB-Wasm UI can read it. The main `gantry` bucket stays private. Each bucket has its own bucket-scoped API token.
 
 ## Repository Layout
 ```text
@@ -30,7 +31,8 @@ gantry-lakehouse/
 ## Safety & Compliance Rules
 - NEVER hardcode secrets or corporate identifiers.
 - Read credentials strictly from `.env` using `python-dotenv` locally and `modal.Secret` in remote jobs.
-- All R2 writes must be confined to the configured bucket (`R2_BUCKET_NAME`).
+- All R2 writes must be confined to the configured bucket (`R2_BUCKET_NAME`), or to `gantry-demo` when using the `DEMO_R2_*` token.
+- Never put telemetry or other non-public data in `gantry-demo`, and never apply CORS or public access to the private `gantry` bucket.
 - Always run tests against ephemeral prefixes (`data/test_runs/run_<uuid>`) and ensure fixtures clean up after themselves.
 - Never compact, rewrite or delete under `telemetry/` without checking the factory's telemetry contract first.
 

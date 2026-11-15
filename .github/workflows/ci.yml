@@ -5,33 +5,47 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  integration-tests:
+  # The PR check. Runs against a local S3 stand-in (moto) and references no secrets, so a PR
+  # branch can change anything in this job without reaching R2.
+  offline-tests:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - run: pytest tests/offline -v --tb=short
 
+  # Live R2 test. Bound to the `r2-live` GitHub environment, which holds the R2 secrets and
+  # requires owner approval, so secrets are released only after a human approves the run.
+  # Never triggered by pull_request: a PR could rewrite this job before approval.
+  live-r2-tests:
+    needs: offline-tests
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: r2-live
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
-
-      - name: Install dependencies
-        run: |
+      - run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Run Lakehouse Compaction & Parity Integration Tests
-        run: |
-          pytest tests/test_compaction.py -v --tb=short
+      - run: pytest tests/live -v --tb=short

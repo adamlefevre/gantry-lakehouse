@@ -4,6 +4,7 @@ import sys
 import uuid
 from collections import defaultdict
 from typing import Dict, List
+from urllib.parse import urlparse
 import boto3
 from botocore.config import Config
 import duckdb
@@ -19,7 +20,12 @@ ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID")
 KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
 SECRET_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
 BUCKET_NAME = os.environ.get("R2_BUCKET_NAME")
-R2_ENDPOINT_URL = f"https://{ACCOUNT_ID}.r2.cloudflarestorage.com" if ACCOUNT_ID else ""
+# Test seam: point both boto3 and DuckDB at a local S3-compatible server (the offline tests
+# use moto). Leave unset for real R2.
+ENDPOINT_OVERRIDE = os.environ.get("R2_ENDPOINT_OVERRIDE")
+R2_ENDPOINT_URL = ENDPOINT_OVERRIDE or (
+    f"https://{ACCOUNT_ID}.r2.cloudflarestorage.com" if ACCOUNT_ID else ""
+)
 
 def get_s3_client():
     return boto3.client(
@@ -34,12 +40,19 @@ def get_s3_client():
 def init_duckdb() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
     con.execute("INSTALL httpfs; LOAD httpfs;")
+    extra = ""
+    if ENDPOINT_OVERRIDE:
+        parsed = urlparse(ENDPOINT_OVERRIDE)
+        extra = f""",
+            ENDPOINT '{parsed.netloc}',
+            URL_STYLE 'path',
+            USE_SSL {'true' if parsed.scheme == 'https' else 'false'}"""
     con.execute(f"""
         CREATE OR REPLACE SECRET r2_creds (
             TYPE R2,
             KEY_ID '{KEY_ID}',
             SECRET '{SECRET_KEY}',
-            ACCOUNT_ID '{ACCOUNT_ID}'
+            ACCOUNT_ID '{ACCOUNT_ID}'{extra}
         );
     """)
     return con

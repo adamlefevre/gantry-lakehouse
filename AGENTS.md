@@ -18,7 +18,8 @@ gantry-lakehouse/
 ├── jobs/
 │   └── scheduled_compaction.py    # Modal cron app for automated daily maintenance
 ├── tests/
-│   └── test_compaction.py         # Ephemeral R2 integration test verifying compaction parity
+│   ├── offline/                   # moto S3 stand-in tests, no credentials (PR check)
+│   └── live/                      # Ephemeral R2 integration test (approval-gated in CI)
 ├── docs/
 │   ├── design-notes/              # Historical design context
 │   └── agents/                    # Issue tracker, triage labels, domain-doc conventions

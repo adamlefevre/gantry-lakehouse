@@ -94,14 +94,16 @@ discover_small_files ──► pack_batches ──► compact_partition_batch
 
 ## Testing
 
-`tests/test_compaction.py` is an integration test against real R2:
+`tests/offline/` runs compaction against a local moto S3 server and needs no credentials (`make test-offline`). It is the PR check.
+
+`tests/live/test_compaction_live.py` is an integration test against real R2:
 
 1. Writes 5 synthetic micro-files to a unique prefix, `data/test_runs/run_<uuid>`.
 2. Runs compaction on them.
 3. Checks that the row counts match and the source files are gone.
 4. Deletes the prefix on teardown.
 
-CI runs it on every push and PR to `main` using repository secrets. PRs from forks are skipped, because forks don't get those secrets.
+CI runs the offline tests on every push and PR to `main`, with no secrets. The live test runs only on push to `main` or manual dispatch, in a job bound to the `r2-live` GitHub environment, which holds the R2 secrets and requires owner approval.
 
 ## Quick start
 
@@ -143,7 +145,8 @@ gantry-lakehouse/
 ├── jobs/
 │   └── scheduled_compaction.py    # Modal app "gantry-maintenance", daily cron
 ├── tests/
-│   └── test_compaction.py         # ephemeral-prefix integration test
+│   ├── offline/                   # moto-backed tests, no credentials
+│   └── live/                      # ephemeral-prefix test against real R2
 ├── docs/
 │   ├── design-notes/              # historical design context
 │   └── agents/                    # issue tracker, triage labels, domain-doc conventions
@@ -156,12 +159,11 @@ gantry-lakehouse/
 ## Gantry integration
 
 - **Telemetry:** the Gantry control plane writes one JSON record per task to `telemetry/year=YYYY/month=MM/<taskId>.json` in the private bucket. The record shape is a contract owned by the factory repo (`docs/telemetry.md` there).
-- **Target repo:** issues here labelled `ready-for-agent` are picked up by the factory. The only test needs live R2 credentials, which factory sandboxes never get, so for now factory runs here open **draft PRs only**.
+- **Target repo:** issues here labelled `ready-for-agent` are picked up by the factory. `.gantry.yml` runs the offline tests, which need no credentials, so factory runs here open regular PRs.
 
 ## Roadmap
 
 - A browser query UI with DuckDB-Wasm, reading `gantry-demo` directly. This needs public access (r2.dev or a custom domain) turned on for that bucket.
-- An offline test suite, so factory runs can open regular, non-draft PRs.
 - Possibly a catalog layer such as DuckLake.
 
 ## License

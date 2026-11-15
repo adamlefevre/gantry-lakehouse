@@ -5,7 +5,7 @@ export
 # Public demo bucket (open CORS, NYC Taxi sample only). Keep telemetry out of it.
 DEMO_BUCKET_NAME ?= gantry-demo
 
-.PHONY: help init-bucket cors ingest compact test modal-test modal-deploy clean demo-init demo-ingest
+.PHONY: help init-bucket cors ingest compact test test-offline modal-test modal-deploy clean demo-init demo-ingest
 
 help:
 	@echo "gantry-lakehouse commands:"
@@ -13,7 +13,8 @@ help:
 	@echo "  make cors         - Apply CORS policy to the R2 bucket"
 	@echo "  make ingest       - Stream NYC Taxi parquet sample into R2 via DuckDB"
 	@echo "  make compact      - Run partition bin-packing & compaction locally"
-	@echo "  make test         - Run ephemeral integration tests"
+	@echo "  make test-offline - Run offline tests against a local S3 stand-in (no credentials)"
+	@echo "  make test         - Run ephemeral integration tests against real R2"
 	@echo "  make modal-test   - Run scheduled compaction once on Modal (real bucket; deletes source files)"
 	@echo "  make modal-deploy - Deploy the daily compaction cron to Modal"
 	@echo "  make clean        - Delete the R2 bucket"
@@ -38,9 +39,13 @@ compact:
 	@echo "==> Running partition compaction on r2://$(R2_BUCKET_NAME)..."
 	python pipelines/compact.py
 
+test-offline:
+	@echo "==> Running offline tests (local S3 stand-in, no credentials)..."
+	pytest tests/offline -v
+
 test:
 	@echo "==> Running lakehouse integration test suite..."
-	pytest tests/test_compaction.py -v -s
+	pytest tests/live -v -s
 
 modal-test:
 	@echo "==> Running scheduled compaction once on Modal (real bucket)..."
